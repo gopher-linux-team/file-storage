@@ -6,23 +6,42 @@ import (
 	"sync"
 )
 
+// Represents the remote node over TCP stablished connection. It implements the Peer interface.
+type TCPPeer struct {
+	conn     net.Conn
+	outbound bool
+}
+
+func NewTCPPeer(conn net.Conn, outbound bool) *TCPPeer {
+	return &TCPPeer{
+		conn:     conn,
+		outbound: outbound,
+	}
+}
+
+type TCPTransportOptions struct {
+	ListenAddr    string
+	HandshakeFunc HandshakeFunc
+	Decoder       Decoder
+}
+
 type TCPTransport struct {
-	listenAddr string
-	listener   net.Listener
+	TCPTransportOptions
+	listener net.Listener
 
 	mux   sync.RWMutex
 	peers map[net.Addr]Peer
 }
 
-func NewTCPTransport(listenAddr string) *TCPTransport {
+func NewTCPTransport(conf TCPTransportOptions) *TCPTransport {
 	return &TCPTransport{
-		listenAddr: listenAddr,
+		TCPTransportOptions: conf,
 	}
 }
 
 func (t *TCPTransport) ListenAndAccept() error {
 	var err error
-	t.listener, err = net.Listen("tcp", t.listenAddr)
+	t.listener, err = net.Listen("tcp", t.ListenAddr)
 	if err != nil {
 		return err
 	}
@@ -30,8 +49,29 @@ func (t *TCPTransport) ListenAndAccept() error {
 	return nil
 }
 
+type Temp struct{}
+
 func (t *TCPTransport) handleConnection(conn net.Conn) {
-	fmt.Printf("new incomming connection %+v\n", conn)
+	peer := NewTCPPeer(conn, true)
+
+	if err := t.HandshakeFunc(peer); err != nil {
+		fmt.Printf("TCP handshake error: %s\n", err)
+		conn.Close()
+		return
+	}
+
+	lenDecodeError := 0
+	// Read loop
+	msg := &Temp{}
+	for {
+		if err := t.Decoder.Decode(conn, msg); err != nil {
+			lenDecodeError++
+			if lenDecodeError > 5 {
+				fmt.Printf("TCP error: %s\n", err)
+				return
+			}
+		}
+	}
 }
 
 func (t *TCPTransport) acceptLoop() error {
@@ -39,7 +79,9 @@ func (t *TCPTransport) acceptLoop() error {
 		conn, err := t.listener.Accept()
 		if err != nil {
 			fmt.Printf("TCP accept error: %s\n", err)
+			continue
 		}
+
 		go t.handleConnection(conn)
 	}
 }
