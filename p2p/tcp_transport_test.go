@@ -11,7 +11,7 @@ func TestTCPTransport(t *testing.T) {
 	tr := NewTCPTransport(TCPTransportOptions{
 		ListenAddr:    listenAddr,
 		HandshakeFunc: NOPHandshakeFunc,
-		Decoder:       &GOBDecoder{},
+		Decoder:       GOBDecoder{},
 	})
 
 	// Server
