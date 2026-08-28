@@ -2,7 +2,8 @@ package main
 
 import (
 	"bytes"
-	"io/ioutil"
+	"fmt"
+	"io"
 	"testing"
 )
 
@@ -14,8 +15,12 @@ func TestStore(t *testing.T) {
 	key := "testfilename"
 	data := []byte("somepngbytes")
 
-	if err := store.write(key, bytes.NewReader(data)); err != nil {
+	if err := store.writeStream(key, bytes.NewReader(data)); err != nil {
 		t.Error(err)
+	}
+
+	if ok := store.Has(key); !ok {
+		t.Errorf("expected to have key: %s", key)
 	}
 
 	r, err := store.Read(key)
@@ -23,10 +28,14 @@ func TestStore(t *testing.T) {
 		t.Error(err)
 	}
 
-	b, _ := ioutil.ReadAll(r)
-	if string(b) != string(data) {
+	b, _ := io.ReadAll(r)
+	if !bytes.Equal(b, data) {
 		t.Errorf("want %s, have %s", data, b)
 	}
+
+	fmt.Println(string(b))
+
+	store.Delete(key)
 
 }
 
@@ -41,4 +50,23 @@ func TestTransformFunc(t *testing.T) {
 	if pathKey.Filename != expectedOriginalKey {
 		t.Errorf("have %s wants %s", pathKey.Filename, expectedOriginalKey)
 	}
+}
+
+func TestDelete(t *testing.T) {
+	opts := StoreOptions{
+		TransformFunc: CASTransformFunc,
+	}
+	store := NewStore(opts)
+
+	key := "testfilename"
+	data := []byte("somepngbytes")
+
+	if err := store.writeStream(key, bytes.NewReader(data)); err != nil {
+		t.Error(err)
+	}
+
+	if err := store.Delete(key); err != nil {
+		t.Error(err)
+	}
+
 }
