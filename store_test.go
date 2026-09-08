@@ -8,35 +8,41 @@ import (
 )
 
 func TestStore(t *testing.T) {
-	opts := StoreOptions{
-		TransformFunc: CASTransformFunc,
+	store := newStore()
+	defer teardown(t, store)
+
+	for i := 0; i < 50; i++ {
+		key := fmt.Sprintf("test_%v", i)
+		data := []byte("somepngbytes")
+
+		if err := store.writeStream(key, bytes.NewReader(data)); err != nil {
+			t.Error(err)
+		}
+
+		if ok := store.Has(key); !ok {
+			t.Errorf("expected to have key: %s", key)
+		}
+
+		r, err := store.Read(key)
+		if err != nil {
+			t.Error(err)
+		}
+
+		b, _ := io.ReadAll(r)
+		if !bytes.Equal(b, data) {
+			t.Errorf("want %s, have %s", data, b)
+		}
+
+		fmt.Println(string(b))
+
+		if err := store.Delete(key); err != nil {
+			t.Error(err)
+		}
+
+		if ok := store.Has(key); ok {
+			t.Errorf("expected to not have such key")
+		}
 	}
-	store := NewStore(opts)
-	key := "testfilename"
-	data := []byte("somepngbytes")
-
-	if err := store.writeStream(key, bytes.NewReader(data)); err != nil {
-		t.Error(err)
-	}
-
-	if ok := store.Has(key); !ok {
-		t.Errorf("expected to have key: %s", key)
-	}
-
-	r, err := store.Read(key)
-	if err != nil {
-		t.Error(err)
-	}
-
-	b, _ := io.ReadAll(r)
-	if !bytes.Equal(b, data) {
-		t.Errorf("want %s, have %s", data, b)
-	}
-
-	fmt.Println(string(b))
-
-	store.Delete(key)
-
 }
 
 func TestTransformFunc(t *testing.T) {
@@ -52,21 +58,15 @@ func TestTransformFunc(t *testing.T) {
 	}
 }
 
-func TestDelete(t *testing.T) {
+func newStore() *Store {
 	opts := StoreOptions{
 		TransformFunc: CASTransformFunc,
 	}
-	store := NewStore(opts)
+	return NewStore(opts)
+}
 
-	key := "testfilename"
-	data := []byte("somepngbytes")
-
-	if err := store.writeStream(key, bytes.NewReader(data)); err != nil {
+func teardown(t *testing.T, s *Store) {
+	if err := s.Clear(); err != nil {
 		t.Error(err)
 	}
-
-	if err := store.Delete(key); err != nil {
-		t.Error(err)
-	}
-
 }
