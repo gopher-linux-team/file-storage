@@ -1,7 +1,9 @@
 package p2p
 
 import (
+	"errors"
 	"fmt"
+	"log"
 	"net"
 )
 
@@ -50,6 +52,12 @@ func (t *TCPTransport) Consume() <-chan RPC {
 	return t.rpcChan
 }
 
+// Close implements the Transport interface. It closes the underlying TCP listener.
+func (t *TCPTransport) Close() error {
+	return t.listener.Close()
+}
+
+// ListenAndAccept implements the Transport interface. It starts listening for incoming TCP connections and accepts them.
 func (t *TCPTransport) ListenAndAccept() error {
 	var err error
 	t.listener, err = net.Listen("tcp", t.ListenAddr)
@@ -57,11 +65,15 @@ func (t *TCPTransport) ListenAndAccept() error {
 		return err
 	}
 	go t.acceptLoop()
+
+	log.Printf("TCP transport listening on %s\n", t.ListenAddr)
 	return nil
 }
 
 type Temp struct{}
 
+// handleConnection handles an incoming TCP connection. It performs the handshake,
+// calls the OnPeer callback, and starts reading RPC messages from the connection.
 func (t *TCPTransport) handleConnection(conn net.Conn) {
 	var err error
 
@@ -96,9 +108,14 @@ func (t *TCPTransport) handleConnection(conn net.Conn) {
 	}
 }
 
-func (t *TCPTransport) acceptLoop() error {
+// acceptLoop continuously accepts incoming TCP connections and handles them in separate goroutines.
+func (t *TCPTransport) acceptLoop() {
 	for {
 		conn, err := t.listener.Accept()
+		if errors.Is(err, net.ErrClosed) {
+			log.Println("TCP listener closed, stopping accept loop")
+			return
+		}
 		if err != nil {
 			fmt.Printf("TCP accept error: %s\n", err)
 			continue

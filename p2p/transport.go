@@ -10,5 +10,5 @@ type Peer interface {
 type Transport interface {
 	ListenAndAccept() error
 	Consume() <-chan RPC
-	Connect(addr string) (Peer, error)
+	Close() error
 }

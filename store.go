@@ -135,6 +135,10 @@ func (s *Store) readStream(key string) (io.ReadCloser, error) {
 	return os.Open(fullpwroot)
 }
 
+func (s *Store) Write(key string, r io.Reader) error {
+	return s.writeStream(key, r)
+}
+
 func (s *Store) Read(key string) (io.Reader, error) {
 	file, err := s.readStream(key)
 	if err != nil {

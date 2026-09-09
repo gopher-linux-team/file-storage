@@ -1,36 +1,36 @@
 package main
 
 import (
-	"fmt"
 	"log"
+	"time"
 
 	"github.com/gopher-linux-team/file-storage/p2p"
 )
 
 func main() {
-	fmt.Println("Running")
-	tcpOpts := p2p.TCPTransportOptions{
+
+	tcpTransportOpts := p2p.TCPTransportOptions{
 		ListenAddr:    ":3000",
 		HandshakeFunc: p2p.NOPHandshakeFunc,
 		Decoder:       p2p.DefaultDecoder{},
-		OnPeer: func(peer p2p.Peer) error {
-			fmt.Printf("New peer connected: %+v\n", peer)
-			return nil
-		},
+		//TODO: onPeer: func(p p2p.Peer) error {}
 	}
-	tr := p2p.NewTCPTransport(tcpOpts)
+
+	tcpTransport := p2p.NewTCPTransport(tcpTransportOpts)
+	fileSrvopts := FSrvOpts{
+		StorageRoot:   "3000_BKNet",
+		PathTransform: CASTransformFunc,
+		Transport:     tcpTransport,
+	}
+	srv := NewFileServer(fileSrvopts)
 
 	go func() {
-		for {
-			msg := tr.Consume()
-			fmt.Printf("%+v\n", msg)
-		}
+		time.Sleep(time.Second * 3)
+		srv.Stop()
 	}()
 
-	if err := tr.ListenAndAccept(); err != nil {
-		log.Fatalf("Error starting TCP transport: %v", err)
+	if err := srv.Run(); err != nil {
+		log.Fatal(err)
 	}
 
-	fmt.Println("Listening")
-	select {}
 }
