@@ -20,6 +20,16 @@ func NewTCPPeer(conn net.Conn, outbound bool) *TCPPeer {
 	}
 }
 
+func (p *TCPPeer) Send(b []byte) error {
+	_, err := p.conn.Write(b)
+	return err
+}
+
+// RemoteAddr implements the Peer interface.
+func (p *TCPPeer) RemoteAddr() net.Addr {
+	return p.conn.RemoteAddr()
+}
+
 // Close implements the Peer interface.
 // It closes the underlying TCP connection.
 func (p *TCPPeer) Close() error {
@@ -57,6 +67,16 @@ func (t *TCPTransport) Close() error {
 	return t.listener.Close()
 }
 
+// Dial implements the Transport interface. It establishes a TCP connection to the specified address.
+func (t *TCPTransport) Dial(addr string) error {
+	conn, err := net.Dial("tcp", addr)
+	if err != nil {
+		return err
+	}
+	go t.handleConnection(conn, true)
+	return nil
+}
+
 // ListenAndAccept implements the Transport interface. It starts listening for incoming TCP connections and accepts them.
 func (t *TCPTransport) ListenAndAccept() error {
 	var err error
@@ -74,7 +94,7 @@ type Temp struct{}
 
 // handleConnection handles an incoming TCP connection. It performs the handshake,
 // calls the OnPeer callback, and starts reading RPC messages from the connection.
-func (t *TCPTransport) handleConnection(conn net.Conn) {
+func (t *TCPTransport) handleConnection(conn net.Conn, outbound bool) {
 	var err error
 
 	defer func() {
@@ -82,7 +102,7 @@ func (t *TCPTransport) handleConnection(conn net.Conn) {
 		conn.Close()
 	}()
 
-	peer := NewTCPPeer(conn, true)
+	peer := NewTCPPeer(conn, outbound)
 
 	if err := t.HandshakeFunc(peer); err != nil {
 		return
@@ -121,6 +141,6 @@ func (t *TCPTransport) acceptLoop() {
 			continue
 		}
 
-		go t.handleConnection(conn)
+		go t.handleConnection(conn, false)
 	}
 }
